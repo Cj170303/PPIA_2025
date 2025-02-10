@@ -16,10 +16,7 @@ CORS(app)
 History = [[
     {
         "id": 0,
-        "responseChatbot": ("Usted iniciará práctica libre ejercicios. Equipo pedagógico Pensando Problemas preparó instrucciones."
-                              "\nResponda según conocimientos sin presiones."
-                              "\nResultados obtendrán utilidad para refinar algoritmo recomendación ejercicios."
-                              "\n\nAtentamente: Equipo de Pensando Problemas.")
+        "responseChatbot": ("Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\nPor favor sientase con toda la confianza de responder las preguntas según sus conocimientos y sin presiones de ningún tipo.\nLos resultados que obtenga serán utilizados para refinar nuestro algoritmo de recomendación de ejercicios.\nAdicionalmente, si encuentra algún problema o inconsistencia dentro de la App o con alguna pregunta, por favor, háganoslo saber.\n\nAtentamente: Equipo de Pensando Problemas.")
     }
 ]]
 history_path = "react_build/"
@@ -187,7 +184,7 @@ def chatgpt_route():
         Tu respuesta debe estar en el formato: 
         tema dificultad (ej: logica 2)
 
-        También puedes escribir: 'Hablar con IA' para resolver preguntas de lógica matemática.'''
+        También puedes escribir: 'Hablar con IA' para resolver preguntas que tenga.'''
         return jsonify({'response': selected_instructions})
     chatbot_response = get_chatgpt_response(user_message)
     return jsonify({'response': chatbot_response})
@@ -221,7 +218,7 @@ def receive_question():
                     Tu respuesta debe estar en el formato: 
                     tema dificultad (ej: logica 2)
 
-                    También puedes escribir: 'Hablar con IA' para resolver preguntas de lógica matemática.'''
+                    También puedes escribir: 'Hablar con IA' para resolver preguntas que tenga.'''
                 responseChatbot = selected_instructions
                 response = {
                     'id': q_id,
