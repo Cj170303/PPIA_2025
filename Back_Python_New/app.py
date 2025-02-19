@@ -103,7 +103,7 @@ def tail_message():
         for level, count in sorted_dict_failed.items()
     )
     rec_str = f"El resumen de la práctica es el siguiente: \n{summary_succeed}\n\n{summary_failed}"
-    return ("Ha finalizado la práctica.\nUsted realizó {} ejercicios.\nEl tema elegido fue {}.\n{}\n¿ Desea reiniciar un quiz ?\n Si desea salir de la aplicación escriba: exit"
+    return ("Ha finalizado la práctica.\nUsted realizó {} ejercicios.\nEl tema elegido fue {}.\n{}\n¿ Desea reiniciar un quiz ?"
             .format(len(record), temas_str, rec_str))
 
 def call_image(id):
@@ -306,7 +306,7 @@ tema dificultad (ej: logica 2)'''
                 record = []
                 responseChatbot = "reinit"
             elif responseStudent and ("no" in responseStudent.lower()):
-                responseChatbot = os.path.join('react_build', 'Images', 'exit.png')
+                responseChatbot = tail_message()
             else:
                 responseChatbot = "No entendí tu respuesta. ¿ Desea reiniciar un quiz ?"
             response = {
