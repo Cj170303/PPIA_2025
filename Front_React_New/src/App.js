@@ -154,7 +154,7 @@ function App() {
   // Front
   return (
     <div className="main">
-      <h1>Quiz de Matematicas</h1>
+      <h1>Robot PP</h1>
       <div class="border d-table w-100">
       </div>
       <div className='container'>
