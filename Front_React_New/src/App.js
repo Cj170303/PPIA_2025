@@ -151,7 +151,7 @@ function App() {
   </fieldset></form></div>);
   }
 
-  // Front
+  // Front 
   return (
     <div className="main">
       <h1>Robot PP</h1>

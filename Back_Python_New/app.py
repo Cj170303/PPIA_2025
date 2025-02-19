@@ -306,7 +306,7 @@ tema dificultad (ej: logica 2)'''
                 record = []
                 responseChatbot = "reinit"
             elif responseStudent and ("no" in responseStudent.lower()):
-                responseChatbot = tail_message()
+                responseChatbot = os.path.join('react_build', 'Images', 'exit.png')
             else:
                 responseChatbot = "No entendí tu respuesta. ¿ Desea reiniciar un quiz ?"
             response = {
