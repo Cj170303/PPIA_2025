@@ -6,9 +6,6 @@ import json
 import io
 import openai
 
-# Configuración de API (clave de OpenAI)
-openai.api_key = "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"
-
 app = Flask(__name__, static_folder='react_build')
 CORS(app)
 
@@ -16,7 +13,15 @@ CORS(app)
 History = [[
     {
         "id": 0,
-        "responseChatbot": ("Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\nPor favor sientase con toda la confianza de responder las preguntas según sus conocimientos y sin presiones de ningún tipo.\nLos resultados que obtenga serán utilizados para refinar nuestro algoritmo de recomendación de ejercicios.\nAdicionalmente, si encuentra algún problema o inconsistencia dentro de la App o con alguna pregunta, por favor, háganoslo saber.\n\nAtentamente: Equipo de Pensando Problemas.")
+        "responseChatbot": ("Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\n"
+                            "Por favor sientase con toda la confianza de responder las preguntas según sus conocimientos y sin presiones de ningún tipo.\n"
+                            "Los resultados que obtenga serán utilizados para refinar nuestro algoritmo de recomendación de ejercicios.\n"
+                            "Adicionalmente, si encuentra algún problema o inconsistencia dentro de la App o con alguna pregunta, por favor, háganoslo saber.\n\n"
+                            "Atentamente: Equipo de Pensando Problemas.")
+    },
+    {
+        "id": 1,
+        "responseChatbot": "Lo primero que hay que saber es que semana de universidad estás"
     }
 ]]
 history_path = "react_build/"
@@ -28,44 +33,59 @@ success_fail = True # Control respuesta correcta/incorrecta
 selected_theme = None
 k = 140             # Variable de control (parámetro interno)
 
+# Variables globales adicionales para manejo de etapa y temas permitidos
+user_week = None
+allowed_temas = []  # Temas disponibles conforme a la semana
+
+# Función que, según número de semana, retorna lista de temas permitidos
+def get_available_temas(week):
+    try:
+        week = int(week)
+    except Exception as e:
+        return []
+    if week <= 2:
+        return ["logica"]
+    elif week <= 4:
+        return ["logica", "lenguaje"]
+    else:
+        return ["logica", "lenguaje", "funciones"]
+
 # Importar preguntas (estructura dict con identificadores, temas, niveles y respuestas)
 from Prompt_Completion_V00 import Preguntas
 
-def retrieve_temas_dif():
+# Función modificada para extraer únicamente temas permitidos (si se provee filtro)
+def retrieve_temas_dif(temas_permitidos=None):
     temas = []
     difs = []
     for preg in Preguntas:
-        if Preguntas[preg]['tema'] not in temas:
-            temas.append(Preguntas[preg]['tema'])
-        if Preguntas[preg]['dif'] not in difs:
-            difs.append(Preguntas[preg]['dif'])
+        if temas_permitidos is None or Preguntas[preg]['tema'] in temas_permitidos:
+            if Preguntas[preg]['tema'] not in temas:
+                temas.append(Preguntas[preg]['tema'])
+            if Preguntas[preg]['dif'] not in difs:
+                difs.append(Preguntas[preg]['dif'])
     return temas, difs
 
 def load_history():
     global History, inicializador_id
     file_path = os.path.join(history_path, "History.json")
-    (temas, difs) = retrieve_temas_dif()
-    temas_str = "\t\t- " + ",\n\t\t- ".join(map(str, temas))
-    difs_str = "\t\t- " + ", ".join(map(str, difs))
-    list_temas_difs = f'''Elige un tema y una dificultad dentro de la lista para empezar el quiz:  
-        Temas: 
-{temas_str}
-
-        Dificultades: 
-{difs_str}
-
-Tu respuesta debe estar en el formato: 
-tema dificultad (ej: logica 2)
-
-También puedes escribir: 'Hablar con IA' para resolver preguntas de lógica matemática.'''
     inicializador_id = 1
-    if os.path.exists(file_path):
-        History[0].append({'id': 1, 'responseChatbot': list_temas_difs})
-        with io.open(file_path, 'w', encoding='utf-8') as history_file:
-            history_file.write(json.dumps(History))
-    else:
-        with io.open(file_path, 'w', encoding='utf-8') as history_file:
-            history_file.write(json.dumps([[]]))
+    # Se inicializa el historial con los dos mensajes deseados
+    History = [[
+        {
+            "id": 0,
+            "responseChatbot": ("Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\n"
+                                "Por favor sientase con toda la confianza de responder las preguntas según sus conocimientos y sin presiones de ningún tipo.\n"
+                                "Los resultados que obtenga serán utilizados para refinar nuestro algoritmo de recomendación de ejercicios.\n"
+                                "Adicionalmente, si encuentra algún problema o inconsistencia dentro de la App o con alguna pregunta, por favor, háganoslo saber.\n\n"
+                                "Atentamente: Equipo de Pensando Problemas.")
+        },
+        {
+            "id": 1,
+            "responseChatbot": "Lo primero que hay que saber es que semana de universidad estás"
+        }
+    ]]
+    with io.open(file_path, 'w', encoding='utf-8') as history_file:
+        history_file.write(json.dumps(History))
 
 def fail_message():
     return ("Se ha equivocado en la elección de la respuesta correcta. "
@@ -140,59 +160,10 @@ def update_question(success_fail, inicializador_id):
         print("No hay más ejercicios disponibles.")
         return None
 
-# Función auxiliar para obtener respuesta desde API OpenAI (ChatGPT)
-def get_chatgpt_response(user_message):
-    try:
-        response = openai.ChatCompletion.create(
-            model="text-moderation-latest",
-            messages=[
-                {"role": "system", "content": ("Eres asistente inteligencia artificial. "
-                                                 "Responde cualquier pregunta formulada.")},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=200
-        )
-        chatbot_response = response['choices'][0]['message']['content']
-        return chatbot_response
-    except Exception as e:
-        return f"Error en llamada a IA: {str(e)}"
-
-# Ruta específica para modo IA (comunicación directa con ChatGPT)
-@app.route('/api/chatgpt', methods=['POST'])
-def chatgpt_route():
-    data = request.get_json()
-    if not data or not data.get('responseStudent') or data.get('responseStudent').isspace():
-        return jsonify({'error': 'La pregunta está vacía'}), 400
-    user_message = data.get('responseStudent')
-    # Verificar comando para salir del modo IA
-    if "salir de la ia" in user_message.lower() or "volver al quiz" in user_message.lower():
-        # Recuperación de temas y dificultades
-        (temas, difs) = retrieve_temas_dif()
-
-        # Construcción de las cadenas formateadas sin incluir secuencias de escape directamente en el f-string
-        temas_list_str = ",\n\t- ".join(map(str, temas))
-        difs_list_str = ", ".join(map(str, difs))
-
-        # Construcción del mensaje de selección de tema y dificultad utilizando las variables previamente definidas
-        list_temas_difs = f'''Elige un tema y una dificultad dentro de la lista para empezar el quiz:  
-                Temas: 
-        \t- {temas_list_str}
-
-                Dificultades: 
-        \t- {difs_list_str}
-
-        Tu respuesta debe estar en el formato: 
-        tema dificultad (ej: logica 2)
-
-        También puedes escribir: 'Hablar con IA' para resolver preguntas que tenga.'''
-        return jsonify({'response': selected_instructions})
-    chatbot_response = get_chatgpt_response(user_message)
-    return jsonify({'response': chatbot_response})
-
 # Ruta principal para procesamiento de preguntas y respuestas
 @app.route('/api/query', methods=['POST'])
 def receive_question():
-    global inicializador_id, record, info, success_fail, selected_theme
+    global inicializador_id, record, info, success_fail, selected_theme, user_week, allowed_temas
     try:
         data = request.get_json()
         if not data:
@@ -202,44 +173,33 @@ def receive_question():
         q_id = history[-1]['id'] if history else 0
         question = history[-1]['responseChatbot'] if history else ""
         
-        # Flujo: conversación en modo IA
-        if "¡bienvenido a la ia!" in question.lower():
-            if responseStudent and ("salir de la ia" in responseStudent.lower() or "volver al quiz" in responseStudent.lower()):
-                temas, difs = retrieve_temas_dif()
-                temas_join = ",\n\t- ".join(map(str, temas))
-                difs_join = ", ".join(map(str, difs))
-                selected_instructions = f'''Elige un tema y una dificultad dentro de la lista para empezar el quiz:  
-                            Temas: 
-                    \t- {temas_join}
-
-                            Dificultades: 
-                    \t- {difs_join}
-
-                    Tu respuesta debe estar en el formato: 
-                    tema dificultad (ej: logica 2)
-
-                    También puedes escribir: 'Hablar con IA' para resolver preguntas que tenga.'''
-                responseChatbot = selected_instructions
+        # Flujo: procesamiento de respuesta a la pregunta sobre la semana
+        if "Lo primero que hay que saber es que semana de universidad estás" in question:
+            try:
+                week = int(responseStudent.strip())
+            except Exception as e:
+                responseChatbot = "Respuesta inválida. Ingrese un número correspondiente a la semana de universidad."
                 response = {
                     'id': q_id,
                     'responseStudent': responseStudent,
                     'responseChatbot': responseChatbot
                 }
                 return jsonify({'message': response})
-            # Evaluar entrada en modo IA (evitar mensaje vacío)
-            if not responseStudent or responseStudent.isspace():
-                return jsonify({'error': 'La pregunta está vacía'}), 400
-            chatbot_response = get_chatgpt_response(responseStudent)
-            response = {
-                'id': q_id,
-                'responseStudent': responseStudent,
-                'responseChatbot': chatbot_response
-            }
-            return jsonify({'message': response})
-        
-        # Flujo: iniciar conversación con IA
-        if responseStudent and "hablar con ia" in responseStudent.lower():
-            responseChatbot = "¡Bienvenido a la IA! Puedes hacerme cualquier pregunta."
+            user_week = week
+            allowed_temas = get_available_temas(week)
+            (temas, difs) = retrieve_temas_dif(allowed_temas)
+            temas_str = "\t- " + "\n\t- ".join(map(str, temas))
+            difs_str = "\t- " + ", ".join(map(str, difs))
+            list_temas_difs = f'''Elige un tema y una dificultad dentro de la lista para empezar el quiz:  
+    Temas: 
+{temas_str}
+
+    Dificultades: 
+{difs_str}
+
+Tu respuesta debe estar en el formato: 
+tema dificultad (ej: logica 2)'''
+            responseChatbot = list_temas_difs
             response = {
                 'id': q_id,
                 'responseStudent': responseStudent,
@@ -249,7 +209,7 @@ def receive_question():
         
         # Flujo: selección de tema y dificultad para quiz
         if "Elige un tema y una dificultad" in question:
-            (temas, difs) = retrieve_temas_dif()
+            (temas, difs) = retrieve_temas_dif(allowed_temas)
             selected_dif = None
             for tema in temas:
                 if tema.lower() in responseStudent.lower():
@@ -263,10 +223,10 @@ def receive_question():
                 temas_str = "\t- " + ",\n\t- ".join(map(str, temas))
                 difs_str = "\t- " + ", ".join(map(str, difs))
                 list_temas_difs = f'''Elige un tema y una dificultad dentro de la lista para empezar el quiz:  
-        Temas: 
+    Temas: 
 {temas_str}
 
-        Dificultades: 
+    Dificultades: 
 {difs_str}
 
 Tu respuesta debe estar en el formato: 

@@ -35,19 +35,23 @@ function App() {
     );
   }
   
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    
-    const userExists = authConf.users.some(
-      user => user.studentNumber === studentNumber && user.password === password
-    );
-    
-    if (userExists) {
-      setConnected(true);
-    } else {
-      console.log("Nombre de usuario o contraseña incorrectos, por favor inténtalo de nuevo.");
+    try {
+        const response = await fetch("/authConf.json");
+        const authData = await response.json();
+        const userExists = authData.users.some(
+            user => user.studentNumber === studentNumber && user.password === password
+        );
+        if (userExists) {
+            setConnected(true);
+        } else {
+            console.log("Nombre de usuario o contraseña incorrectos.");
+        }
+    } catch (error) {
+        console.error("Error cargando authConf.json:", error);
     }
-  };
+};
 
   const fetchChatHistory = async () => {
     try {

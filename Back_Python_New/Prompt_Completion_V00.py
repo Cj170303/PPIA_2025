@@ -5,7 +5,6 @@
 #----------------------------------------------------------#
 
 Preguntas = {
-    # Preguntas originales (1–20)
     1:  {'res':['c'], 'dif':1, 'tema':'logica'},
     2:  {'res':['a'], 'dif':2, 'tema':'logica'},
     3:  {'res':['b'], 'dif':2, 'tema':'logica'},
@@ -51,11 +50,12 @@ Preguntas = {
     43: {'res':['a'], 'dif':1, 'tema':'lenguaje'},  
     44: {'res':['b'], 'dif':1, 'tema':'lenguaje'},  
     45: {'res':['b'], 'dif':2, 'tema':'lenguaje'},  
-    46: {'res':['d'], 'dif':1, 'tema':'lenguaje'}, 
-    47: {'res':['b'], 'dif':1, 'tema':'lenguaje'}, 
-    48: {'res':['b'], 'dif':2, 'tema':'lenguaje'},  
-    49: {'res':['c'], 'dif':3, 'tema':'lenguaje'}, 
-    50: {'res':['b'], 'dif':3, 'tema':'lenguaje'}   
+    46: {'res':['d'], 'dif':1, 'tema':'funciones'}, 
+    47: {'res':['b'], 'dif':1, 'tema':'funciones'}, 
+    48: {'res':['b'], 'dif':2, 'tema':'funciones'},  
+    49: {'res':['c'], 'dif':3, 'tema':'funciones'}, 
+    50: {'res':['b'], 'dif':3, 'tema':'funciones'}   
 }
 
+#Las preguntas de "funciones", no son de funciones, es una prueba nada más
 
