@@ -17,24 +17,28 @@ def load_preguntas_from_latex(file_name):
     file_path = os.path.join(current_dir, file_name)
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
+    pattern = r"\\begin\{question\}\{(\d+)\}\{([^\}]+)\}\{(\d+)\}\{([^\}]+)\}\{(\d+)\}\{([\s\S]+?)\}\s*\\end\{question\}"
 
-    pattern = r"\\begin\{question\}\{(\d+)\}\{([^\}]+)\}\{(\d+)\}\{([^\}]+)\}\{([\s\S]+?)\}\s*\\end\{question\}"
+
 
     preguntas = {}
     matches = re.findall(pattern, content, re.DOTALL)
 
     for match in matches:
-        qid, tema, dif, res, enunciado = match
-        qid = int(qid)
-        dif = int(dif)
-        res_list = [r.strip() for r in res.split(',')]
+        qid_str, tema, dif_str, res_str, week_str, enunciado = match
+
+        qid = int(qid_str)
+        dif = int(dif_str)
+        week = int(week_str)  # conversión a entero
+
+        res_list = [r.strip() for r in res_str.split(',')]
         preguntas[qid] = {
             'tema': tema,
             'dif': dif,
             'res': res_list,
+            'week': week,
             'enunciado': enunciado.strip()
         }
     return preguntas
 
 Preguntas = load_preguntas_from_latex("Preguntas.tex")
-print(Preguntas)
