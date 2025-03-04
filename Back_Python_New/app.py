@@ -1,299 +1,381 @@
+import os
+import io
+import json
+import random
+import subprocess
+import tempfile
+import openai
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import random
-import os
-import json
-import io
-import openai
+from Prompt_Completion_V00 import Preguntas
+
 
 app = Flask(__name__, static_folder='react_build')
 CORS(app)
 
-# Variables globales (histórico, control, registros)
+@app.route('/api/convert_latex', methods=['GET'])
+def convert_latex_to_html():
+    try:
+        # Archivo .tex en la misma carpeta de app.py
+        tex_path = os.path.join(os.getcwd(), "Preguntas.tex")
+        html_path = os.path.join(os.getcwd(), "Preguntas.html")
+
+        subprocess.run(["pandoc", tex_path, "-o", html_path], check=True)
+
+        with open(html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        return jsonify({"html": html_content})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 History = [[
     {
         "id": 0,
-        "responseChatbot": ("Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\n"
-                            "Por favor sientase con toda la confianza de responder las preguntas según sus conocimientos y sin presiones de ningún tipo.\n"
-                            "Los resultados que obtenga serán utilizados para refinar nuestro algoritmo de recomendación de ejercicios.\n"
-                            "Adicionalmente, si encuentra algún problema o inconsistencia dentro de la App o con alguna pregunta, por favor, háganoslo saber.\n\n"
-                            "Atentamente: Equipo de Pensando Problemas.")
+        "responseChatbot": (
+            "Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\n"
+            "Por favor siéntase con toda la confianza de responder las preguntas según sus conocimientos.\n"
+            "Los resultados que obtenga serán utilizados para refinar nuestro algoritmo.\n"
+            "Adicionalmente, si encuentra algún problema, háganoslo saber.\n\n"
+            "Atentamente: Equipo de Pensando Problemas."
+        )
     },
     {
         "id": 1,
-        "responseChatbot": "Lo primero que hay que saber es que semana de universidad estás"
+        "responseChatbot": "Lo primero que hay que saber es: ¿en qué semana de universidad estás?"
     }
 ]]
+
 history_path = "react_build/"
-
-record = []         # Registro de ejercicios realizados
+record = []
 inicializador_id = 1
-info = {}           # Información ejercicio actual
-success_fail = True # Control respuesta correcta/incorrecta
+info = {}
+success_fail = True
 selected_theme = None
-k = 140             # Variable de control (parámetro interno)
-
-# Variables globales adicionales para manejo de etapa y temas permitidos
+k = 140
 user_week = None
-allowed_temas = []  # Temas disponibles conforme a la semana
+allowed_temas = []
 
-# Función que, según número de semana, retorna lista de temas permitidos
 def get_available_temas(week):
     try:
-        week = int(week)
-    except Exception as e:
+        w = int(week)
+    except:
         return []
-    if week <= 2:
+    if w <= 2:
         return ["logica"]
-    elif week <= 4:
+    elif w <= 4:
         return ["logica", "lenguaje"]
     else:
         return ["logica", "lenguaje", "funciones"]
-
-# Importar preguntas (estructura dict con identificadores, temas, niveles y respuestas)
-from Prompt_Completion_V00 import Preguntas
-
-# Función modificada para extraer únicamente temas permitidos (si se provee filtro)
-def retrieve_temas_dif(temas_permitidos=None):
-    temas = []
-    difs = []
-    for preg in Preguntas:
-        if temas_permitidos is None or Preguntas[preg]['tema'] in temas_permitidos:
-            if Preguntas[preg]['tema'] not in temas:
-                temas.append(Preguntas[preg]['tema'])
-            if Preguntas[preg]['dif'] not in difs:
-                difs.append(Preguntas[preg]['dif'])
-    return temas, difs
 
 def load_history():
     global History, inicializador_id
     file_path = os.path.join(history_path, "History.json")
     inicializador_id = 1
-    # Se inicializa el historial con los dos mensajes deseados
     History = [[
         {
             "id": 0,
-            "responseChatbot": ("Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\n"
-                                "Por favor sientase con toda la confianza de responder las preguntas según sus conocimientos y sin presiones de ningún tipo.\n"
-                                "Los resultados que obtenga serán utilizados para refinar nuestro algoritmo de recomendación de ejercicios.\n"
-                                "Adicionalmente, si encuentra algún problema o inconsistencia dentro de la App o con alguna pregunta, por favor, háganoslo saber.\n\n"
-                                "Atentamente: Equipo de Pensando Problemas.")
+            "responseChatbot": (
+                "Usted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó para usted.\n"
+                "Por favor siéntase con toda la confianza de responder las preguntas.\n"
+                "Los resultados que obtenga serán utilizados para refinar nuestro algoritmo.\n"
+                "Adicionalmente, si encuentra algún problema, háganoslo saber.\n\n"
+                "Atentamente: Equipo de Pensando Problemas."
+            )
         },
         {
             "id": 1,
-            "responseChatbot": "Lo primero que hay que saber es que semana de universidad estás"
+            "responseChatbot": "Lo primero que hay que saber es: ¿en qué semana de universidad estás?"
         }
     ]]
     with io.open(file_path, 'w', encoding='utf-8') as history_file:
         history_file.write(json.dumps(History))
 
+def retrieve_temas_dif(temas_permitidos=None):
+    temas = []
+    difs = []
+    for pid in Preguntas:
+        if temas_permitidos is None or Preguntas[pid]['tema'] in temas_permitidos:
+            if Preguntas[pid]['tema'] not in temas:
+                temas.append(Preguntas[pid]['tema'])
+            if Preguntas[pid]['dif'] not in difs:
+                difs.append(Preguntas[pid]['dif'])
+    return temas, difs
+
 def fail_message():
-    return ("Se ha equivocado en la elección de la respuesta correcta. "
-            "A continuación se le mostrará ejercicio de nivel menor o igual al realizado. "
-            "¿ Desea Continuar ?")
+    return (
+        "Se ha equivocado en la elección de la respuesta correcta. "
+        "A continuación se le mostrará un ejercicio de nivel menor o igual al realizado. "
+        "¿ Desea Continuar ?"
+    )
 
 def success_message():
-    return ("Ha acertado en la elección de la respuesta correcta. "
-            "A continuación se le mostrará ejercicio de nivel superior o igual al realizado. "
-            "¿ Desea Continuar ?")
+    return (
+        "Ha acertado en la elección de la respuesta correcta. "
+        "A continuación se le mostrará un ejercicio de nivel superior o igual al realizado. "
+        "¿ Desea Continuar ?"
+    )
 
 def tail_message():
     global record
+    if len(record) == 0:
+        return "Ha finalizado la práctica.\nUsted realizó 0 ejercicios.\n\n¿ Desea reiniciar un quiz ?"
+
     themes = []
     difs_succeed = {}
     difs_failed = {}
-    if len(record) == 0:
-        return "Ha finalizado la práctica.\nUsted realizó {} ejercicios.\n\n¿ Desea reiniciar un quiz ?".format(len(record))
-    for rec in record:
-        if Preguntas[rec[0]]['tema'] not in themes:
-            themes.append(Preguntas[rec[0]]['tema'])
-        if rec[1]:
-            difs_succeed[Preguntas[rec[0]]['dif']] = difs_succeed.get(Preguntas[rec[0]]['dif'], 0) + 1
+    for rec_i in record:
+        pid, was_correct = rec_i
+        tema = Preguntas[pid]['tema']
+        dif = Preguntas[pid]['dif']
+        if tema not in themes:
+            themes.append(tema)
+        if was_correct:
+            difs_succeed[dif] = difs_succeed.get(dif, 0) + 1
         else:
-            difs_failed[Preguntas[rec[0]]['dif']] = difs_failed.get(Preguntas[rec[0]]['dif'], 0) + 1
-    temas_str = ", ".join(map(str, themes))
-    sorted_dict_succeed = dict(sorted(difs_succeed.items()))
-    summary_succeed = "\n ".join(
-        f"\t- {count} preguntas{'s' if count > 1 else ''} del nivel {level} logradas"
-        for level, count in sorted_dict_succeed.items()
-    )
-    sorted_dict_failed = dict(sorted(difs_failed.items()))
-    summary_failed = "\n ".join(
-        f"\t- {count} preguntas{'s' if count > 1 else ''} del nivel {level} perdidas"
-        for level, count in sorted_dict_failed.items()
-    )
-    rec_str = f"El resumen de la práctica es el siguiente: \n{summary_succeed}\n\n{summary_failed}"
-    return ("Ha finalizado la práctica.\nUsted realizó {} ejercicios.\nEl tema elegido fue {}.\n{}\n¿ Desea reiniciar un quiz ?"
-            .format(len(record), temas_str, rec_str))
+            difs_failed[dif] = difs_failed.get(dif, 0) + 1
 
-def call_image(id):
-    img = os.path.join('react_build', 'Images', f'Preg_0{id}.png')
-    return img
+    temas_str = ", ".join(str(t) for t in themes)
 
-def call_question(id):
-    return Preguntas[id]
+    def format_difs(difs_dict):
+        lines = []
+        for level, count in sorted(difs_dict.items()):
+            lines.append(f"\t- {count} pregunta(s) del nivel {level}")
+        return "\n".join(lines)
+
+    summary_succeed = format_difs(difs_succeed)
+    summary_failed = format_difs(difs_failed)
+
+    rec_str = (
+        f"El resumen de la práctica es el siguiente:\n"
+        f"{summary_succeed}\n\n{summary_failed}"
+    )
+
+    return (
+        f"Ha finalizado la práctica.\n"
+        f"Usted realizó {len(record)} ejercicios.\n"
+        f"El tema elegido fue {temas_str}.\n"
+        f"{rec_str}\n¿ Desea reiniciar un quiz ?"
+    )
+
+def convert_latex_string_to_html(latex_str):
+    """
+    Convierte un string LaTeX a HTML usando Pandoc de forma temporal.
+    Retorna el HTML como string.
+    """
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".tex", delete=False) as tmp_tex:
+            tmp_tex.write(latex_str.encode('utf-8'))
+            tmp_tex_path = tmp_tex.name
+
+        tmp_html_path = tmp_tex_path.replace(".tex", ".html")
+
+        subprocess.run(["pandoc", tmp_tex_path, "-o", tmp_html_path], check=True)
+
+        with open(tmp_html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+
+        # Limpieza opcional de archivos temporales
+        os.remove(tmp_tex_path)
+        os.remove(tmp_html_path)
+
+        return html_content
+
+    except Exception as e:
+        return f"<p>Error al convertir LaTeX: {str(e)}</p>"
 
 def init_question(selected_dif):
     global selected_theme
-    indices = [preg for preg in Preguntas 
-               if Preguntas[preg]['tema'] == selected_theme and Preguntas[preg]['dif'] == selected_dif]
-    indice = random.choice(indices)
-    return indice
+    candidates = [
+        pid for pid in Preguntas
+        if Preguntas[pid]['tema'] == selected_theme
+        and Preguntas[pid]['dif'] == selected_dif
+    ]
+    return random.choice(candidates) if candidates else None
 
-def update_question(success_fail, inicializador_id):
+def call_question(pid):
+    return Preguntas[pid]
+
+def update_question(success_fail, pid):
     global info, selected_theme
-    indices = []
-    dificultad_actual = Preguntas[inicializador_id]['dif']
-    filtered_preguntas = {key: value for key, value in Preguntas.items() if value['tema'] == selected_theme}
-    for pregunta in filtered_preguntas:
-        if pregunta != inicializador_id:
-            if success_fail:
-                if info['dif'] >= dificultad_actual:
-                    indices.append(pregunta)
-            else:
-                if info['dif'] <= dificultad_actual:
-                    indices.append(pregunta)
-    try:
-        indice = random.choice(indices)
-        return indice
-    except Exception as e:
+    dificultad_actual = Preguntas[pid]['dif']
+    same_tema = {k: v for k, v in Preguntas.items() if v['tema'] == selected_theme}
+
+    candidates = []
+    for qid, data in same_tema.items():
+        if qid == pid:
+            continue
+        if success_fail:
+            if data['dif'] >= dificultad_actual:
+                candidates.append(qid)
+        else:
+            if data['dif'] <= dificultad_actual:
+                candidates.append(qid)
+
+    if not candidates:
         print("No hay más ejercicios disponibles.")
         return None
+    return random.choice(candidates)
 
-# Ruta principal para procesamiento de preguntas y respuestas
 @app.route('/api/query', methods=['POST'])
 def receive_question():
-    global inicializador_id, record, info, success_fail, selected_theme, user_week, allowed_temas
+    global inicializador_id, record, info, success_fail, selected_theme
+    global user_week, allowed_temas
+
     try:
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No se recibió información'}), 400
-        responseStudent = data.get('responseStudent')
+
+        responseStudent = data.get('responseStudent', '')
         history = data.get('history') or []
         q_id = history[-1]['id'] if history else 0
-        question = history[-1]['responseChatbot'] if history else ""
-        
-        # Flujo: procesamiento de respuesta a la pregunta sobre la semana
-        if "Lo primero que hay que saber es que semana de universidad estás" in question:
+        question_txt = history[-1]['responseChatbot'] if history else ""
+
+        # Caso 1: el chatbot preguntó la semana
+        if "en qué semana de universidad estás" in question_txt:
             try:
                 week = int(responseStudent.strip())
-            except Exception as e:
-                responseChatbot = "Respuesta inválida. Ingrese un número correspondiente a la semana de universidad."
-                response = {
+            except:
+                resp = {
                     'id': q_id,
                     'responseStudent': responseStudent,
-                    'responseChatbot': responseChatbot
+                    'responseChatbot': "Respuesta inválida. Ingrese un número correspondiente a la semana."
                 }
-                return jsonify({'message': response})
+                return jsonify({'message': resp})
+
             user_week = week
             allowed_temas = get_available_temas(week)
             (temas, difs) = retrieve_temas_dif(allowed_temas)
-            temas_str = "\t- " + "\n\t- ".join(map(str, temas))
-            difs_str = "\t- " + ", ".join(map(str, difs))
-            list_temas_difs = f'''Elige un tema y una dificultad dentro de la lista para empezar el quiz:  
-    Temas: 
-{temas_str}
 
-    Dificultades: 
-{difs_str}
+            temas_str = "\n".join(f"- {t}" for t in temas)
+            difs_str = ", ".join(str(d) for d in difs)
 
-Tu respuesta debe estar en el formato: 
-tema dificultad (ej: logica 2)'''
-            responseChatbot = list_temas_difs
-            response = {
+            msg = (
+                "Elige un tema y una dificultad dentro de la lista para empezar el quiz:\n\n"
+                f"Temas:\n{temas_str}\n\n"
+                f"Dificultades:\n{difs_str}\n\n"
+                "Tu respuesta debe ser: tema dificultad (ej: logica 2)"
+            )
+            resp = {
                 'id': q_id,
                 'responseStudent': responseStudent,
-                'responseChatbot': responseChatbot
+                'responseChatbot': msg
             }
-            return jsonify({'message': response})
-        
-        # Flujo: selección de tema y dificultad para quiz
-        if "Elige un tema y una dificultad" in question:
+            return jsonify({'message': resp})
+
+        # Caso 2: selección de tema y dificultad
+        if "Elige un tema y una dificultad" in question_txt:
             (temas, difs) = retrieve_temas_dif(allowed_temas)
             selected_dif = None
-            for tema in temas:
-                if tema.lower() in responseStudent.lower():
-                    selected_theme = tema
+            for t in temas:
+                if t.lower() in responseStudent.lower():
+                    selected_theme = t
                     break
-            for dif in difs:
-                if str(dif) in responseStudent:
-                    selected_dif = dif
+            for d in difs:
+                if str(d) in responseStudent:
+                    selected_dif = d
                     break
-            if selected_theme is None or selected_dif is None:
-                temas_str = "\t- " + ",\n\t- ".join(map(str, temas))
-                difs_str = "\t- " + ", ".join(map(str, difs))
-                list_temas_difs = f'''Elige un tema y una dificultad dentro de la lista para empezar el quiz:  
-    Temas: 
-{temas_str}
 
-    Dificultades: 
-{difs_str}
-
-Tu respuesta debe estar en el formato: 
-tema dificultad (ej: logica 2)'''
-                responseChatbot = "No entendí tu respuesta.\n" + list_temas_difs
+            if not selected_theme or not selected_dif:
+                # Repetir el mensaje
+                temas_str = "\n".join(f"- {t}" for t in temas)
+                difs_str = ", ".join(str(d) for d in difs)
+                msg = (
+                    "No entendí tu respuesta.\n"
+                    "Elige un tema y una dificultad dentro de la lista:\n\n"
+                    f"Temas:\n{temas_str}\n\n"
+                    f"Dificultades:\n{difs_str}\n\n"
+                    "Ej: logica 2"
+                )
+                resp = {
+                    'id': q_id,
+                    'responseStudent': responseStudent,
+                    'responseChatbot': msg
+                }
+                return jsonify({'message': resp})
             else:
                 inicializador_id = init_question(selected_dif)
-                responseChatbot = call_image(inicializador_id)
-            response = {
+                if inicializador_id is None:
+                    resp = {
+                        'id': q_id,
+                        'responseStudent': responseStudent,
+                        'responseChatbot': "No hay ejercicios disponibles con ese tema/dificultad."
+                    }
+                    return jsonify({'message': resp})
+
+                # Convertir enunciado LaTeX a HTML
+                latex_str = Preguntas[inicializador_id]['enunciado']
+                responseChatbot = convert_latex_string_to_html(latex_str)
+
+            resp = {
                 'id': q_id,
                 'responseStudent': responseStudent,
                 'responseChatbot': responseChatbot
             }
-            return jsonify({'message': response})
-        
-        # Flujo: manejo de respuestas en quiz (continuar, reiniciar, evaluación)
-        if "¿ Desea Continuar ?" in question:
-            if responseStudent and ("si" in responseStudent.lower() or "yes" in responseStudent.lower()):
-                inicializador_id = update_question(success_fail, inicializador_id)
-                if inicializador_id is None:
+            return jsonify({'message': resp})
+
+        # Caso 3: Manejo de "¿Desea Continuar?" o "¿Desea reiniciar?"
+        if "¿ Desea Continuar ?" in question_txt:
+            if responseStudent.lower() in ["si", "sí", "yes"]:
+                # Actualizar pregunta
+                new_id = update_question(success_fail, inicializador_id)
+                if new_id is None:
                     responseChatbot = tail_message()
                 else:
-                    responseChatbot = call_image(inicializador_id)
-            elif responseStudent and ("no" in responseStudent.lower()):
+                    inicializador_id = new_id
+                    latex_str = Preguntas[inicializador_id]['enunciado']
+                    responseChatbot = convert_latex_string_to_html(latex_str)
+            elif responseStudent.lower() in ["no"]:
                 responseChatbot = tail_message()
             else:
                 responseChatbot = "No entendí tu respuesta. ¿ Desea Continuar ?"
-            response = {
+
+            resp = {
                 'id': q_id,
                 'responseStudent': responseStudent,
                 'responseChatbot': responseChatbot
             }
-            return jsonify({'message': response})
-        
-        if "¿ Desea reiniciar un quiz ?" in question:
-            if responseStudent and ("si" in responseStudent.lower() or "yes" in responseStudent.lower()):
-                record = []
+            return jsonify({'message': resp})
+
+        if "¿ Desea reiniciar un quiz ?" in question_txt:
+            if responseStudent.lower() in ["si", "sí", "yes"]:
+                record.clear()
                 responseChatbot = "reinit"
-            elif responseStudent and ("no" in responseStudent.lower()):
+            elif responseStudent.lower() in ["no"]:
+                # Ejemplo: se podría mostrar una imagen de salida
                 responseChatbot = os.path.join('react_build', 'Images', 'exit.png')
             else:
                 responseChatbot = "No entendí tu respuesta. ¿ Desea reiniciar un quiz ?"
-            response = {
+
+            resp = {
                 'id': q_id,
                 'responseStudent': responseStudent,
                 'responseChatbot': responseChatbot
             }
-            return jsonify({'message': response})
-        
-        # Flujo: evaluación respuesta ejercicio (quiz)
-        if not responseStudent or responseStudent.isspace():
+            return jsonify({'message': resp})
+
+        # Caso 4: Evaluar la respuesta
+        if not responseStudent.strip():
             return jsonify({'error': 'La pregunta está vacía'}), 400
+
         info = call_question(inicializador_id)
-        success_fail = responseStudent in info['res']
+        success_fail = (responseStudent.strip().lower() in [r.lower() for r in info['res']])
         record.append((inicializador_id, success_fail))
+
         responseChatbot = success_message() if success_fail else fail_message()
-        response = {
+
+        resp = {
             'id': q_id,
             'responseStudent': responseStudent,
             'responseChatbot': responseChatbot
         }
-        return jsonify({'message': response})
-    
+        return jsonify({'message': resp})
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Rutas para servir aplicación front-end (React)
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):

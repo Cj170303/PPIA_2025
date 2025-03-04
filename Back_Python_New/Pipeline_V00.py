@@ -4,21 +4,14 @@
 # Por: Mateo Alejandro Rodríguez Ramírez
 #----------------------------------------------------------#
 
-# Cargue de Paquetes:
 
-ruta = r'./'
 import os
 import random
 import psutil
-os.chdir(ruta)
-os.listdir()
-
 from Prompt_Completion_V00 import Preguntas
-from PIL import Image
 
-# Iniciales:
 k = 140
-emph = '#'+'-'*k+'#'
+emph = '#' + '-'*k + '#'
 
 def init_message():
     print(emph)
@@ -27,11 +20,20 @@ def init_message():
     return codigo
 
 def head():
-    head_message = emph+'\nUsted iniciará la práctica libre de ejercicios que el equipo pedagógico de Pensando Problemas preparó.\nPor favor sientase con toda la confianza de responder las preguntas según sus conocimientos y sin presiones de ningún tipo.\nLos resultados que obtenga serán utilizados para refinar nuestro algoritmo de recomendación de ejercicios.\n\nAtentamente: Equipo de Pensando Problemas.\n'+emph
+    head_message = (
+        emph + '\nUsted iniciará la práctica libre de ejercicios.\n'
+        'Por favor sientase con toda la confianza de responder las preguntas.\n'
+        'Los resultados que obtenga serán utilizados para refinar nuestro algoritmo.\n\n'
+        'Atentamente: Equipo de Pensando Problemas.\n' + emph
+    )
     print(head_message)
 
 def tail(n):
-    tail_message = '\n\n'+emph+'\nHa finalizado la práctica.\nUsted realizó {} ejercicios.\n'.format(n)+emph
+    tail_message = (
+        '\n\n' + emph +
+        f'\nHa finalizado la práctica.\nUsted realizó {n} ejercicios.\n' +
+        emph
+    )
     print(tail_message)
 
 def ask_message():
@@ -39,90 +41,94 @@ def ask_message():
     return ask_msg
 
 def fail_message():
-    fail_msg = '\n\nSe ha equivocado en la elección de la respuesta correcta. A continuación se le mostrará un ejercicio de nivel menor o igual al que realizó.\n\n'
+    fail_msg = (
+        '\n\nSe ha equivocado en la elección de la respuesta correcta. '
+        'A continuación se le mostrará un ejercicio de nivel menor o igual.\n\n'
+    )
     print(fail_msg)
 
 def success_message():
-    success_msg = '\n\nHa acertado en la elección de la respuesta correcta. A continuación se le mostrará un ejercicio de nivel superior o igual al que realizó.\n\n'
+    success_msg = (
+        '\n\nHa acertado en la elección de la respuesta correcta. '
+        'A continuación se le mostrará un ejercicio de nivel superior o igual.\n\n'
+    )
     print(success_msg)
 
 def continuacion():
     continuar = input('\n¿Desea Continuar (yes:1,no:0)?: ')
-    enter = (continuar=='1')
-    return enter
+    return (continuar == '1')
 
-def call_image(id): 
-    img = Image.open('../../Preguntas/Preg_0{}.png'.format(id))
-    img.show()
+def call_question_text(pid):
+    pregunta = Preguntas[pid]
+    print("Pregunta:", pregunta['enunciado'])
 
-def call_question(id):
-    return Preguntas[id]
+def call_question(pid):
+    return Preguntas[pid]
 
 def close_image():
     for proc in psutil.process_iter():
-        print(proc)
-        if proc.name() == "display":
-            proc.kill()
+        try:
+            if proc.name() == "display":
+                proc.kill()
+        except:
+            pass
 
-def update_question(success_fail,info,inicializador_id):
-    indices = []
-    dificultad_actual = Preguntas[inicializador_id]['dif']
-    for pregunta in Preguntas:
-        if pregunta != inicializador_id:
-            if success_fail:
-                if info['dif']>= dificultad_actual:
-                    indices.append(pregunta)
-            else:
-                if info['dif']<= dificultad_actual:
-                    indices.append(pregunta)
-    try:
-        indice = random.choice(indices)
-        return indice
-    except:
-        print('\nNo hay más ejercicios para que usted resuelva.\n')
+def update_question(success_fail, info, pid):
+    dificultad_actual = Preguntas[pid]['dif']
+    candidates = []
+    for qid, data in Preguntas.items():
+        if qid == pid:
+            continue
+        if success_fail:
+            if data['dif'] >= dificultad_actual:
+                candidates.append(qid)
+        else:
+            if data['dif'] <= dificultad_actual:
+                candidates.append(qid)
 
-#-------------------------------
-# Corrida del programa
+    if not candidates:
+        print('\nNo hay más ejercicios disponibles.\n')
+        return None
+    return random.choice(candidates)
 
 def program():
     record = []
     enter = True
     n = 0
-    inicializador_id = 1
+    pid = 1
     while enter:
-        if n==0: 
-            head() # Mensaje de Bienvenida al programa.
-        n+=1
-        call_image(inicializador_id) # Muestra la pregunta.
-        info = call_question(inicializador_id) # Obtiene la información de la pregunta.
-        response = ask_message() # Pide la respuesta al estudiante.
-        success_fail = response in info['res'] # Revisa si la respuesta es correcta o no.
-        record.append((inicializador_id,success_fail)) #  
+        if n == 0:
+            head()
+        n += 1
+
+        # Muestra la pregunta
+        call_question_text(pid)
+        info = call_question(pid)
+        response = ask_message()
+        success_fail = (response.strip().lower() in [r.lower() for r in info['res']])
+        record.append((pid, success_fail))
+
         if success_fail:
-            success_message() # Mensaje de acierto en la respuesta
+            success_message()
         else:
-            fail_message() # Mensaje de fallo en la respuesta:
-        #close_image() #Se cierra la imagen en cuestión.
-        enter =continuacion() # Pregunta si se desea continuar, independiente de si acierta o no.
-        inicializador_id = update_question(success_fail,info,inicializador_id) # Se actualiza a una nueva pregunta para que el estudiante resuelva.
-        if enter==False: 
-            tail(n) # Mensaje de Salida del programa.    
-    return(record)
+            fail_message()
+
+        enter = continuacion()
+        pid = update_question(success_fail, info, pid)
+        if pid is None:
+            enter = False
+
+        if not enter:
+            tail(n)
+    return record
 
 def run_program():
     nombre = init_message()
     puntaje = program()
-    return({nombre:puntaje})
+    return {nombre: puntaje}
 
-if False:
-    for k in psutil.process_iter():
-        k.name()
-        if k.name()=='display':
-            print('Hola')
-
-run_program()
-
-
+if __name__ == "__main__":
+    run_program()
 
 
 
