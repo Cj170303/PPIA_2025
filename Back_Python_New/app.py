@@ -345,7 +345,7 @@ def receive_question():
                 responseChatbot = "reinit"
             elif responseStudent.lower() in ["no"]:
                 # Ejemplo: se podría mostrar una imagen de salida
-                responseChatbot = os.path.join('react_build', 'Images', 'exit.png')
+                responseChatbot = os.path.join('exit.png')
             else:
                 responseChatbot = "No entendí tu respuesta. ¿ Desea reiniciar un quiz ?"
 
