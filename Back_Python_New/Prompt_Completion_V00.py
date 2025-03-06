@@ -29,7 +29,7 @@ def load_preguntas_from_latex(file_name):
 
         qid = int(qid_str)
         dif = int(dif_str)
-        week = int(week_str)  # conversión a entero
+        week = int(week_str) 
 
         res_list = [r.strip() for r in res_str.split(',')]
         preguntas[qid] = {
