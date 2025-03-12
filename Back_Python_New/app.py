@@ -4,9 +4,13 @@ import json
 import random
 import subprocess
 import tempfile
+import re
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from Prompt_Completion_V00 import Preguntas  # Debe tener 'week' en cada pregunta
+
+
 
 app = Flask(__name__, static_folder='react_build')
 CORS(app)
@@ -96,7 +100,9 @@ def success_message():
 
 def tail_message():
     global record
-    if len(record) == 0:
+    num_exercises = len(record)
+    ejercicio_text = "ejercicio" if num_exercises == 1 else "ejercicios"
+    if num_exercises == 0:
         return "Ha finalizado la práctica.\nUsted realizó 0 ejercicios.\n\n¿ Desea reiniciar un quiz ?"
 
     themes = []
@@ -114,23 +120,35 @@ def tail_message():
             difs_failed[dif] = difs_failed.get(dif, 0) + 1
 
     temas_str = ", ".join(str(t) for t in themes)
+    total_acertadas = sum(difs_succeed.values())
+    total_falladas = sum(difs_failed.values())
+    acertadas_text = "acertada" if total_acertadas == 1 else "acertadas"
+    falladas_text = "fallada" if total_falladas == 1 else "falladas"
 
     def format_difs(difs_dict):
         lines = []
         for level, count in sorted(difs_dict.items()):
-            lines.append(f"\t- {count} pregunta(s) del nivel {level}")
+            pregunta_text = "pregunta" if count == 1 else "preguntas"
+            lines.append(f"\t- {count} {pregunta_text} del nivel {level}")
         return "\n".join(lines)
 
     summary_succeed = format_difs(difs_succeed)
     summary_failed = format_difs(difs_failed)
-    rec_str = f"El resumen de la práctica es:\n{summary_succeed}\n\n{summary_failed}"
+    rec_str = (
+        f"Aquí se encuentra el resumen de la práctica:\n\n"
+        f"Usted ha acertado ({total_acertadas} {acertadas_text}):\n{summary_succeed}\n\n"
+        f"Usted ha fallado ({total_falladas} {falladas_text}):\n{summary_failed}"
+    )
 
     return (
         f"Ha finalizado la práctica.\n"
-        f"Usted realizó {len(record)} ejercicios.\n"
-        f"El tema elegido fue {temas_str}.\n"
-        f"{rec_str}\n¿ Desea reiniciar un quiz ?"
+        f"Ha completado todos los ejercicios disponibles con los parámetros ingresados.\n"
+        f"Usted realizó {num_exercises} {ejercicio_text} y el tema elegido fue {temas_str}.\n\n"
+        f"{rec_str}\nSi desea reiniciar el quiz, escriba: reiniciar"
+        f"\n\n Espero haber ayudado en tu aprendizaje, nos vemos en la próxima práctica libre."
     )
+
+
 
 def convert_latex_string_to_html(latex_str):
     """
@@ -199,12 +217,6 @@ def call_question(pid):
     return Preguntas[pid]
 
 def update_question(success_fail, pid):
-    """
-    Actualiza a una nueva pregunta del mismo tema.
-    - Si acertó (success_fail=True), busca preguntas de dificultad >= actual
-    - Si falló, busca preguntas de dificultad <= actual
-    - Filtra también por 'week' <= user_week
-    """
     global selected_theme, user_week
     dificultad_actual = Preguntas[pid]['dif']
     same_tema = {
@@ -215,6 +227,9 @@ def update_question(success_fail, pid):
     candidates = []
     for qid, data in same_tema.items():
         if qid == pid:
+            continue
+        # Excluir ejercicios que ya hayan sido respondidos correctamente
+        if any(r[0] == qid and r[1] for r in record):
             continue
         if success_fail:
             if data['dif'] >= dificultad_actual:
@@ -228,9 +243,6 @@ def update_question(success_fail, pid):
         return None
     return random.choice(candidates)
 
-# ---------------------------------------------------------------------------------
-# ENDPOINT PRINCIPAL /api/query
-# ---------------------------------------------------------------------------------
 @app.route('/api/query', methods=['POST'])
 def receive_question():
     global inicializador_id, record, info, success_fail, selected_theme
@@ -245,6 +257,15 @@ def receive_question():
         history = data.get('history') or []
         q_id = history[-1]['id'] if history else 0
         question_txt = history[-1]['responseChatbot'] if history else ""
+
+        if responseStudent.strip().lower() == "reiniciar":
+            record.clear()
+            resp = {
+                'id': q_id,
+                'responseStudent': responseStudent,
+                'responseChatbot': "reinit"
+            }
+            return jsonify({'message': resp})
 
         # 1. El chatbot preguntó la semana
         if "en qué semana de universidad estás" in question_txt:
@@ -335,10 +356,19 @@ def receive_question():
 
             inicializador_id = init_question(selected_dif)
             if inicializador_id is None:
+                temas_str = "\n".join(f"- {t}" for t in allowed_temas)
+                difs_str = ", ".join(str(d) for d in difs)
+                msg = (
+                    "No hay ejercicios disponibles con tema/dificultad indicados.\n"
+                    "Elija tema y dificultad dentro de la lista disponible:\n\n"
+                    f"Temas:\n{temas_str}\n\n"
+                    f"Dificultades:\n{difs_str}\n\n"
+                    "Ejemplo: logica 2"
+                )
                 resp = {
                     'id': q_id,
                     'responseStudent': responseStudent,
-                    'responseChatbot': "No hay ejercicios disponibles con ese tema/dificultad."
+                    'responseChatbot': msg
                 }
                 return jsonify({'message': resp})
 
@@ -357,7 +387,11 @@ def receive_question():
             if responseStudent.lower() in ["si", "sí", "yes"]:
                 new_id = update_question(success_fail, inicializador_id)
                 if new_id is None:
-                    responseChatbot = tail_message()
+                    responseChatbot = (
+                        "Lamentablemente no hay más preguntas, ya completó todos los ejercicios posibles con los parámetros ingresados.\n\n"
+                        + tail_message()
+                    )
+
                 else:
                     inicializador_id = new_id
                     latex_str = Preguntas[inicializador_id]['enunciado']
@@ -396,7 +430,9 @@ def receive_question():
 
         info = call_question(inicializador_id)
         # Chequeo de acierto
-        success_fail = (responseStudent.strip().lower() in [r.lower() for r in info['res']])
+        normalized_response = normalize_answer(responseStudent)
+        normalized_correct = [normalize_answer(r) for r in info['res']]
+        success_fail = normalized_response in normalized_correct
         record.append((inicializador_id, success_fail))
 
         responseChatbot = success_message() if success_fail else fail_message()
@@ -417,6 +453,11 @@ def serve(path):
         return send_from_directory(app.static_folder, path)
     else:
         return send_from_directory(app.static_folder, 'index.html')
+
+def normalize_answer(answer):
+    normalized = answer.strip().lower()
+    normalized = re.sub(r"[\(\)\[\]\{\}]", "", normalized)
+    return normalized.strip()
 
 # ---------------------------------------------------------------------------------
 if __name__ == '__main__':
