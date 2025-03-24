@@ -58,9 +58,6 @@ success_fail = True
 selected_theme = None
 user_week = None
 
-# ---------------------------------------------------------------------------------
-# Funciones auxiliares
-# ---------------------------------------------------------------------------------
 def load_history():
     global History, inicializador_id
     file_path = os.path.join(history_path, "History.json")
@@ -175,43 +172,46 @@ def convert_latex_string_to_html(latex_str):
     except Exception as e:
         return f"<p>Error al convertir LaTeX: {str(e)}</p>"
 
-# ---------------------------------------------------------------------------------
-# Filtrado de temas disponibles según la semana
-# ---------------------------------------------------------------------------------
 def get_available_temas(week):
     """
     Retorna la lista de temas que aparecen en preguntas con week <= user_week.
+    Permite múltiples temas por pregunta.
     """
     valid_temas = set()
     for pid, data in Preguntas.items():
         if data['week'] <= week:
-            valid_temas.add(data['tema'])
+            temas = data['tema'].split(",")  # Permitir múltiples temas separados por comas
+            valid_temas.update(temas)
     return sorted(valid_temas)
+
 
 def retrieve_difs_for_temas(temas, week):
     """
-    Retorna las dificultades disponibles para las 'temas' indicadas,
-    solo de preguntas con week <= user_week.
+    Retorna las dificultades disponibles para las preguntas que contienen al menos uno de los temas seleccionados.
     """
     difs = set()
     for pid, data in Preguntas.items():
-        if data['tema'] in temas and data['week'] <= week:
+        pregunta_temas = set(data['tema'].split(","))  # Separar temas en lista
+        if pregunta_temas.intersection(temas) and data['week'] <= week:
             difs.add(data['dif'])
     return sorted(difs)
 
+
 def init_question(selected_dif):
     """
-    Elige una pregunta al azar del tema 'selected_theme' y la dificultad 'selected_dif',
-    filtrando también por 'week' <= user_week.
+    Elige una pregunta al azar con al menos uno de los temas seleccionados y dificultad indicada.
     """
     global selected_theme, user_week
+    temas_seleccionados = set(selected_theme.split(","))  # Convertir a conjunto para comparar
+
     candidates = [
-        pid for pid in Preguntas
-        if Preguntas[pid]['tema'] == selected_theme
-        and Preguntas[pid]['dif'] == selected_dif
-        and Preguntas[pid]['week'] <= user_week
+        pid for pid, data in Preguntas.items()
+        if temas_seleccionados.intersection(set(data['tema'].split(",")))  # Comprobar intersección de temas
+        and data['dif'] == selected_dif
+        and data['week'] <= user_week
     ]
     return random.choice(candidates) if candidates else None
+
 
 def call_question(pid):
     return Preguntas[pid]
@@ -219,23 +219,19 @@ def call_question(pid):
 def update_question(success_fail, pid):
     global selected_theme, user_week
     dificultad_actual = Preguntas[pid]['dif']
-    same_tema = {
-        qid: data for qid, data in Preguntas.items()
-        if data['tema'] == selected_theme and data['week'] <= user_week
-    }
+    temas_seleccionados = set(selected_theme.split(","))
 
     candidates = []
-    for qid, data in same_tema.items():
-        if qid == pid:
-            continue
-        # Excluir ejercicios que ya hayan sido respondidos correctamente
-        if any(r[0] == qid and r[1] for r in record):
-            continue
-        if success_fail:
-            if data['dif'] >= dificultad_actual:
+    for qid, data in Preguntas.items():
+        pregunta_temas = set(data['tema'].split(","))
+        if pregunta_temas.intersection(temas_seleccionados) and data['week'] <= user_week:
+            if qid == pid:
+                continue
+            if any(r[0] == qid and r[1] for r in record):  # Evitar repetir preguntas acertadas
+                continue
+            if success_fail and data['dif'] >= dificultad_actual:
                 candidates.append(qid)
-        else:
-            if data['dif'] <= dificultad_actual:
+            elif not success_fail and data['dif'] <= dificultad_actual:
                 candidates.append(qid)
 
     if not candidates:
@@ -315,72 +311,77 @@ def receive_question():
             }
             return jsonify({'message': resp})
 
-        # 2. Selección de tema y dificultad
         if "Elige un tema y una dificultad" in question_txt:
-            # Reconstruimos la lista de temas y difs disponibles
-            # en base a la semana del usuario
+            # Obtener temas y dificultades disponibles
             allowed_temas = get_available_temas(user_week)
             difs = retrieve_difs_for_temas(allowed_temas, user_week)
 
+            temas_usuario = []
             selected_dif = None
-            found_theme = None
 
-            for t in allowed_temas:
-                if t.lower() in responseStudent.lower():
-                    found_theme = t
-                    break
-            for d in difs:
-                if str(d) in responseStudent:
-                    selected_dif = d
-                    break
-
-            if not found_theme or not selected_dif:
-                temas_str = "\n".join(f"- {t}" for t in allowed_temas)
-                difs_str = ", ".join(str(d) for d in difs)
+            # Procesar la respuesta del usuario
+            response_parts = responseStudent.lower().strip().split()
+            
+            if len(response_parts) < 2:  # Verifica que haya al menos un tema y una dificultad
+                temas_str = ", ".join(allowed_temas)
+                difs_str = ", ".join(map(str, difs))
                 msg = (
                     "No entendí tu respuesta.\n"
-                    "Elige un tema y una dificultad dentro de la lista:\n\n"
-                    f"Temas:\n{temas_str}\n\n"
-                    f"Dificultades:\n{difs_str}\n\n"
-                    "Ej: logica 2"
+                    "Elige uno o más temas separados por comas y una dificultad dentro de la lista:\n\n"
+                    f"Temas: {temas_str}\n"
+                    f"Dificultades: {difs_str}\n\n"
+                    "Ejemplo: logica, conjuntos 2"
                 )
-                resp = {
-                    'id': q_id,
-                    'responseStudent': responseStudent,
-                    'responseChatbot': msg
-                }
-                return jsonify({'message': resp})
+                return jsonify({'message': {'id': q_id, 'responseStudent': responseStudent, 'responseChatbot': msg}})
 
-            global selected_theme
-            selected_theme = found_theme
+            # Extraer la dificultad (debe ser el último elemento)
+            try:
+                selected_dif = int(response_parts[-1])
+            except ValueError:
+                selected_dif = None  # No es un número válido
 
+            # Extraer los temas (todo lo demás antes del número)
+            temas_ingresados = " ".join(response_parts[:-1]).replace(" ", "").split(",")
+
+            # Verificar que los temas ingresados sean válidos
+            for tema in temas_ingresados:
+                if tema in allowed_temas:
+                    temas_usuario.append(tema)
+
+            if not temas_usuario or selected_dif not in difs:
+                temas_str = ", ".join(allowed_temas)
+                difs_str = ", ".join(map(str, difs))
+                msg = (
+                    "No entendí tu respuesta.\n"
+                    "Elige uno o más temas separados por comas y una dificultad dentro de la lista:\n\n"
+                    f"Temas: {temas_str}\n"
+                    f"Dificultades: {difs_str}\n\n"
+                    "Ejemplo: logica, conjuntos 2"
+                )
+                return jsonify({'message': {'id': q_id, 'responseStudent': responseStudent, 'responseChatbot': msg}})
+
+            # Guardamos los temas seleccionados en una cadena separada por comas
+            selected_theme = ",".join(temas_usuario)
+
+            # Seleccionar una pregunta con al menos uno de los temas elegidos
             inicializador_id = init_question(selected_dif)
             if inicializador_id is None:
-                temas_str = "\n".join(f"- {t}" for t in allowed_temas)
-                difs_str = ", ".join(str(d) for d in difs)
+                temas_str = ", ".join(allowed_temas)
+                difs_str = ", ".join(map(str, difs))
                 msg = (
-                    "No hay ejercicios disponibles con tema/dificultad indicados.\n"
-                    "Elija tema y dificultad dentro de la lista disponible:\n\n"
-                    f"Temas:\n{temas_str}\n\n"
-                    f"Dificultades:\n{difs_str}\n\n"
-                    "Ejemplo: logica 2"
+                    "No hay ejercicios disponibles con los temas y dificultad indicados.\n"
+                    "Elija temas y dificultad dentro de la lista disponible:\n\n"
+                    f"Temas: {temas_str}\n"
+                    f"Dificultades: {difs_str}\n\n"
+                    "Ejemplo: logica, conjuntos 2"
                 )
-                resp = {
-                    'id': q_id,
-                    'responseStudent': responseStudent,
-                    'responseChatbot': msg
-                }
-                return jsonify({'message': resp})
+                return jsonify({'message': {'id': q_id, 'responseStudent': responseStudent, 'responseChatbot': msg}})
 
             latex_str = Preguntas[inicializador_id]['enunciado']
             responseChatbot = convert_latex_string_to_html(latex_str)
 
-            resp = {
-                'id': q_id,
-                'responseStudent': responseStudent,
-                'responseChatbot': responseChatbot
-            }
-            return jsonify({'message': resp})
+            return jsonify({'message': {'id': q_id, 'responseStudent': responseStudent, 'responseChatbot': responseChatbot}})
+
 
         # 3. Manejo de "¿Desea Continuar?" o "¿Desea reiniciar?"
         if "¿ Desea Continuar ?" in question_txt:

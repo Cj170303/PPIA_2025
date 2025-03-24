@@ -42,3 +42,5 @@ def load_preguntas_from_latex(file_name):
     return preguntas
 
 Preguntas = load_preguntas_from_latex("Preguntas.tex")
+
+print(Preguntas)
