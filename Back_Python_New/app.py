@@ -226,33 +226,29 @@ def call_question(pid):
 
 def update_question(success_fail, pid):
     """
-    Selecciona la siguiente pregunta considerando los temas elegidos y si el usuario acertó o no.
-    Si no hay más preguntas de dificultad menor o igual tras fallar, se permite repetir preguntas falladas.
+    Selecciona la siguiente pregunta aleatoria dentro del conjunto total de preguntas disponibles.
+    - Si una pregunta se acierta, se elimina del conjunto.
+    - Si una pregunta se falla, sigue disponible.
     """
     global selected_theme, user_week
-    dificultad_actual = Preguntas[pid]['dif']
     temas_seleccionados = set(selected_theme.split(","))
 
-    candidates = []
+    # Registrar la pregunta en el historial
+    record.append((pid, success_fail))
 
-    for qid, data in Preguntas.items():
-        pregunta_temas = set(data['tema'].split(","))  
-        if pregunta_temas & temas_seleccionados and data['week'] <= user_week:  
-            if qid == pid:
-                continue
-            if any(r[0] == qid and r[1] for r in record): 
-                continue
-            if success_fail:  
-                if data['dif'] >= dificultad_actual:
-                    candidates.append(qid)
-            else: 
-                if data['dif'] <= dificultad_actual or not any(r[0] == qid for r in record):
-                    candidates.append(qid)
+    # Construir una lista de todas las preguntas disponibles (las que NO han sido acertadas)
+    available_questions = [
+        qid for qid, data in Preguntas.items()
+        if set(data['tema'].split(",")) & temas_seleccionados and data['week'] <= user_week
+        and not any(r[0] == qid and r[1] for r in record)  # Eliminar solo preguntas ya acertadas
+    ]
 
-    if not candidates:
-        return None  
+    if not available_questions:  # Si no hay más preguntas disponibles, terminar el quiz
+        return None
 
-    return random.choice(candidates)  
+    return random.choice(available_questions)  # Selecciona una pregunta aleatoria de las disponibles
+
+
 
 
 @app.route('/api/query', methods=['POST'])
