@@ -141,8 +141,9 @@ def tail_message():
         f"Ha finalizado la práctica.\n"
         f"Ha completado todos los ejercicios disponibles con los parámetros ingresados.\n"
         f"Usted realizó {num_exercises} {ejercicio_text} y el tema elegido fue {temas_str}.\n\n"
-        f"{rec_str}\nSi desea reiniciar el quiz, escriba: reiniciar"
+        f"{rec_str}"
         f"\n\n Espero haber ayudado en tu aprendizaje, nos vemos en la próxima práctica libre."
+        f"\n\n¿ Desea reiniciar un quiz ?"
     )
 
 
@@ -199,45 +200,60 @@ def retrieve_difs_for_temas(temas, week):
 
 def init_question(selected_dif):
     """
-    Elige una pregunta al azar con al menos uno de los temas seleccionados y dificultad indicada.
+    Selecciona una pregunta al azar que pertenezca a al menos uno de los temas elegidos.
+    Ahora selecciona de manera equitativa entre temas individuales y combinaciones.
     """
     global selected_theme, user_week
-    temas_seleccionados = set(selected_theme.split(","))  # Convertir a conjunto para comparar
+    temas_seleccionados = set(selected_theme.split(","))  # Convertir los temas ingresados a un conjunto
 
+    # Filtrar preguntas que tienen al menos uno de los temas seleccionados
     candidates = [
         pid for pid, data in Preguntas.items()
-        if temas_seleccionados.intersection(set(data['tema'].split(",")))  # Comprobar intersección de temas
+        if temas_seleccionados & set(data['tema'].split(","))  # Usamos & para verificar intersección
         and data['dif'] == selected_dif
         and data['week'] <= user_week
     ]
-    return random.choice(candidates) if candidates else None
+
+    if not candidates:
+        return None  # No hay preguntas disponibles
+
+    return random.choice(candidates)  # Selecciona una pregunta aleatoria de la lista filtrada
+
 
 
 def call_question(pid):
     return Preguntas[pid]
 
 def update_question(success_fail, pid):
+    """
+    Selecciona la siguiente pregunta considerando los temas elegidos y si el usuario acertó o no.
+    Si no hay más preguntas de dificultad menor o igual tras fallar, se permite repetir preguntas falladas.
+    """
     global selected_theme, user_week
     dificultad_actual = Preguntas[pid]['dif']
     temas_seleccionados = set(selected_theme.split(","))
 
     candidates = []
+
     for qid, data in Preguntas.items():
-        pregunta_temas = set(data['tema'].split(","))
-        if pregunta_temas.intersection(temas_seleccionados) and data['week'] <= user_week:
+        pregunta_temas = set(data['tema'].split(","))  
+        if pregunta_temas & temas_seleccionados and data['week'] <= user_week:  
             if qid == pid:
                 continue
-            if any(r[0] == qid and r[1] for r in record):  # Evitar repetir preguntas acertadas
+            if any(r[0] == qid and r[1] for r in record): 
                 continue
-            if success_fail and data['dif'] >= dificultad_actual:
-                candidates.append(qid)
-            elif not success_fail and data['dif'] <= dificultad_actual:
-                candidates.append(qid)
+            if success_fail:  
+                if data['dif'] >= dificultad_actual:
+                    candidates.append(qid)
+            else: 
+                if data['dif'] <= dificultad_actual or not any(r[0] == qid for r in record):
+                    candidates.append(qid)
 
     if not candidates:
-        print("No hay más ejercicios disponibles.")
-        return None
-    return random.choice(candidates)
+        return None  
+
+    return random.choice(candidates)  
+
 
 @app.route('/api/query', methods=['POST'])
 def receive_question():
