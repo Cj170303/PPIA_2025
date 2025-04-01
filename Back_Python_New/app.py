@@ -50,7 +50,7 @@ History = [[
         "responseChatbot": "Lo primero que hay que saber es: ¿en qué semana de universidad estás?"
     }
 ]]
-history_path = "react_build/"
+history_path = "Back_Python_New/react_build/"
 record = []            # Registro de (id_pregunta, acierto?)
 inicializador_id = 1   # ID de la pregunta actual
 info = {}              # Info de la pregunta actual
@@ -475,4 +475,4 @@ def normalize_answer(answer):
 # ---------------------------------------------------------------------------------
 if __name__ == '__main__':
     load_history()
-    app.run(port=3001, debug=True)
+    app.run(host="0.0.0.0", port=3001, debug=True)
