@@ -4,7 +4,10 @@
       { "studentNumber": "04033366", "password": "otraConstrasena" },
       { "studentNumber": "04044477", "password": "unacontrasena" },
       { "studentNumber": "202014193", "password": "cjcarrascal" },
-      { "studentNumber": "1", "password": "1" }
+      { "studentNumber": "1", "password": "1" },
+      { "studentNumber": "12345", "password": "prueba1" },
+      { "studentNumber": "54321", "password": "prueba2" }
+
     ]
   }
   
