@@ -50,7 +50,7 @@ History = [[
         "responseChatbot": "Lo primero que hay que saber es: ¿en qué semana de universidad estás?"
     }
 ]]
-history_path = "Back_Python_New/react_build/"
+history_path = "react_build/"
 record = []            # Registro de (id_pregunta, acierto?)
 inicializador_id = 1   # ID de la pregunta actual
 info = {}              # Info de la pregunta actual
