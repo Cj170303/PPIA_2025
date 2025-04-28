@@ -1,7 +1,7 @@
 #----------------------------------------------------------#
 # Proyecto: Pensando Problemas IA
 # Nombre: Implementación Pipeline V00
-# Por: Mateo Alejandro Rodríguez Ramírez
+# Por: CJ y SS
 #----------------------------------------------------------#
 
 

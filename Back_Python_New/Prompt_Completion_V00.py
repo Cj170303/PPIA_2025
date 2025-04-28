@@ -1,7 +1,7 @@
 #----------------------------------------------------------#
 # Proyecto: Pensando Problemas IA
 # Nombre: Implementación Prompt/Completion V00
-# Por: Mateo Alejandro Rodríguez Ramírez
+# Por: CJ y SS
 #----------------------------------------------------------#
 
 import os
@@ -42,4 +42,9 @@ def load_preguntas_from_latex(file_name):
     return preguntas
 
 Preguntas = load_preguntas_from_latex("Preguntas.tex")
+
+
+
+
+
 
